@@ -1,0 +1,34 @@
+# Dependencies & build artifacts
+node_modules
+.next
+out
+build
+
+# Local development files
+db
+*.db
+*.db-journal
+dev.log
+server.log
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Git & editor
+.git
+.gitignore
+.vscode
+.idea
+
+# Docs & CI (not needed inside the image)
+README.md
+LICENSE
+tests
+examples
+skills
+agent-ctx
+.zscripts
+Dockerfile
+docker-compose.yml

@@ -1,0 +1,84 @@
+// OpenQR — Prisma schema (SQLite variant, used for local development without Docker)
+//
+// The models in this file are kept 1:1 in sync with `schema.postgres.prisma`,
+// which is the schema used for self-hosted production deployments (see
+// docker-compose.yml). Only the datasource provider differs — the SQLite
+// variant lets you run OpenQR locally with zero external dependencies.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  qrCodes      QRCode[]
+  sessions     Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  // Store only a SHA-256 hash of the session token — a leaked database dump
+  // therefore cannot be used to hijack active sessions.
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model QRCode {
+  id               String      @id @default(cuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  description      String?
+  // Unique public identifier used in redirect URLs: /r/{shortCode}
+  shortCode        String      @unique
+  destinationUrl   String
+  isActive         Boolean     @default(true)
+  // QR appearance customization
+  foregroundColor  String      @default("#000000")
+  backgroundColor  String      @default("#FFFFFF")
+  size             Int         @default(512) // export size in px (128–2048)
+  errorCorrection  String      @default("M") // L | M | Q | H
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  scanEvents       ScanEvent[]
+
+  @@index([userId])
+  @@index([shortCode])
+  @@index([createdAt])
+}
+
+model ScanEvent {
+  id        String   @id @default(cuid())
+  qrCodeId  String
+  qrCode    QRCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  // Privacy-friendly aggregates only — no raw IP addresses or fingerprints.
+  country   String?
+  deviceType String? // mobile | tablet | desktop | other
+  browser   String?
+  os        String?
+  referrer  String?
+  // Salted SHA-256 hash of the IP address, used exclusively to compute
+  // unique-scan counts. The original IP can never be recovered.
+  ipHash    String?
+
+  @@index([qrCodeId])
+  @@index([createdAt])
+  @@index([qrCodeId, createdAt])
+  @@index([ipHash])
+}
